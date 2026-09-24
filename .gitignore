@@ -1,0 +1,59 @@
+# ── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Virtual environments ────────────────────────────────
+.venv/
+venv/
+env/
+gv/
+C:/gv/
+
+# ── Model weights (large binary – store on Google Drive / HuggingFace) ──
+*.pth
+*.pt
+*.onnx
+*.tflite
+
+# ── Dataset (too large for GitHub – distributed via SharePoint/Dataport) ─
+dataset/grogu_dataset/
+grogu_dataset/
+dataset/grogu_dataset.zip
+dataset/__pycache__/
+dataset_generation_log.txt
+
+# ── Uploads / temp files ────────────────────────────────
+uploads/
+*.tmp
+*.log
+
+# ── OS artefacts ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE / editor ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Jupyter ─────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Compiled LaTeX artefacts ────────────────────────────
+*.aux
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.toc

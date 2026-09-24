@@ -1,0 +1,18 @@
+graph TD
+    subgraph Visual Branch
+    A1[Input Image] --> B1[MobileNetV2 Backbone]
+    B1 --> C1[Global Average Pool]
+    C1 --> D1[1280-d Vector]
+    end
+
+    subgraph Metadata Branch
+    A2[13-d Metadata Vector] --> B2[FC 64 - ReLU - Dropout]
+    B2 --> C2[FC 64 - ReLU]
+    C2 --> D2[64-d Vector]
+    end
+
+    D1 --> E[Concatenation]
+    D2 --> E
+
+    E --> F[FC 128 - ReLU - Dropout]
+    F --> G[FC 4 - Softmax]

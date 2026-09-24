@@ -1,0 +1,1023 @@
+# GROGU Dataset Generation Pipeline — Full Build Brief
+
+## Project Overview
+
+Build a fully automated Python pipeline that generates a synthetic, bimodal forensic KYC document dataset. The pipeline must produce approximately 4,000 labeled PDF files across 4 classes, where each file carries both a visual layer and a metadata layer that can be independently tampered. No real PII is used at any point.
+
+---
+
+## Tech Stack
+
+```
+python >= 3.10
+faker
+reportlab
+weasyprint
+pillow
+pypdf
+pandas
+scikit-learn
+tqdm
+pathlib
+json
+csv
+shutil
+os
+random
+hashlib
+```
+
+Install all via:
+```bash
+pip install faker reportlab weasyprint pillow pypdf pandas scikit-learn tqdm pymupdf img2pdf
+```
+
+---
+
+## Output Structure
+
+```
+grogu_dataset/
+├── raw_pdfs/
+│   ├── genuine/
+│   ├── font_tampered/
+│   ├── metadata_tampered/
+│   └── both_tampered/
+├── rendered_images/
+│   ├── genuine/
+│   ├── font_tampered/
+│   ├── metadata_tampered/
+│   └── both_tampered/
+├── metadata_vectors/
+│   └── all_metadata.csv
+├── labels/
+│   └── master_labels.csv
+├── splits/
+│   ├── train.csv
+│   ├── val.csv
+│   └── test.csv
+└── generation_log.json
+```
+
+---
+
+## Step 1 — Synthetic Identity Generation
+
+Use Faker to generate one identity record per document. Each record must contain:
+
+```python
+from faker import Faker
+fake = Faker('en_IN')  # Indian locale
+
+def generate_identity():
+    return {
+        "full_name": fake.name(),
+        "dob": fake.date_of_birth(minimum_age=21, maximum_age=60).strftime("%d/%m/%Y"),
+        "address": fake.address().replace("\n", ", "),
+        "account_number": fake.numerify(text="XXXX XXXX XXXX XXXX"),
+        "ifsc": fake.bothify(text="????0######").upper(),
+        "pan": fake.bothify(text="?????####?").upper(),
+        "income": str(random.randint(25000, 250000)),
+        "employer": fake.company(),
+        "email": fake.email(),
+        "phone": fake.phone_number(),
+        "statement_date": fake.date_between(start_date="-2y", end_date="today").strftime("%d/%m/%Y"),
+        "doc_type": random.choice(["bank_statement", "salary_slip", "utility_bill", "address_proof"]),
+        "base_id": fake.uuid4()  # This is the base-document-ID for split control
+    }
+```
+
+---
+
+## Step 2 — Genuine Document Generation (5 Standard Document Templates)
+
+> **Design principle:** GROGU's entire premise is detecting tampering on documents that *look genuinely institutional*. The five template families must therefore vary the way real Indian KYC documents vary across issuers — layout structure, letterhead placement, reference numbering, and standard disclaimer conventions — **not** through decorative styling (italics, saturated accent colors, ornamental fonts). Stylistic diversity that reads as "artistic" rather than "official" would teach the model to associate genuineness with a generator's cosmetic fingerprint instead of real structural cues. All five templates below use standard corporate/institutional formatting conventions.
+
+### Template Family Definitions
+
+```python
+TEMPLATES = {
+    "T1": {
+        "name": "Bank Statement",
+        "issuer": "State-Bank-style Statement of Account",
+        "font_header": "Helvetica-Bold",
+        "font_body": "Helvetica",
+        "header_color": (0.05, 0.15, 0.45),   # Standard corporate navy
+        "font_size_header": 13,
+        "font_size_body": 9,
+        "layout": "letterhead_kv_table",       # logo strip + key-value field table
+        "has_letterhead": True,
+        "has_ref_number": True,
+        "footer_disclaimer": "This is a system-generated statement and does not require a signature."
+    },
+    "T2": {
+        "name": "Salary Slip",
+        "issuer": "Corporate Payslip",
+        "font_header": "Helvetica-Bold",
+        "font_body": "Helvetica",
+        "header_color": (0.15, 0.15, 0.15),   # Near-black, standard payroll styling
+        "font_size_header": 12,
+        "font_size_body": 9,
+        "layout": "table_grid",                # earnings/deductions grid, like real payslips
+        "has_letterhead": True,
+        "has_ref_number": True,
+        "footer_disclaimer": "This is a computer-generated payslip and does not require a physical signature."
+    },
+    "T3": {
+        "name": "Utility Bill",
+        "issuer": "Electricity / Water Board",
+        "font_header": "Helvetica-Bold",
+        "font_body": "Helvetica",
+        "header_color": (0.55, 0.15, 0.05),   # Muted utility-provider orange-red
+        "font_size_header": 12,
+        "font_size_body": 9,
+        "layout": "single_column_billing",     # consumer no. / billing period / amount due block
+        "has_letterhead": True,
+        "has_ref_number": True,
+        "footer_disclaimer": "Consumer Number and Billing Period are required for KYC verification."
+    },
+    "T4": {
+        "name": "Address Proof",
+        "issuer": "Bank Passbook / Rental Agreement Extract",
+        "font_header": "Times-Bold",
+        "font_body": "Times-Roman",
+        "header_color": (0.1, 0.1, 0.1),      # Standard formal black
+        "font_size_header": 12,
+        "font_size_body": 10,
+        "layout": "letterhead",                # formal letterhead block, no italics
+        "has_letterhead": True,
+        "has_ref_number": True,
+        "footer_disclaimer": "Valid as address proof under RBI KYC guidelines."
+    },
+    "T5": {
+        "name": "Income Certificate",
+        "issuer": "Government-issued Income Certificate",
+        "font_header": "Times-Bold",
+        "font_body": "Times-Roman",
+        "header_color": (0.1, 0.1, 0.1),      # Formal government black
+        "font_size_header": 13,
+        "font_size_body": 10,
+        "layout": "certificate_formal",        # emblem placeholder + certificate number + seal line
+        "has_letterhead": True,
+        "has_ref_number": True,
+        "footer_disclaimer": "Issued by the Competent Authority. Certificate Number and Date are mandatory."
+    }
+}
+```
+
+### Genuine PDF Generator
+
+```python
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+import os
+
+def generate_genuine_pdf(identity, template_key, output_path):
+    """
+    Generates a clean genuine PDF styled as a standard institutional document.
+    Returns a dict of field_bounding_boxes for later use by tampering functions.
+    """
+    tmpl = TEMPLATES[template_key]
+    c = canvas.Canvas(output_path, pagesize=A4)
+    width, height = A4
+
+    field_boxes = {}  # {field_name: (x, y, w, h)} — for tampering reference
+
+    # Header
+    r, g, b = tmpl["header_color"]
+    c.setFillColorRGB(r, g, b)
+    c.setFont(tmpl["font_header"], tmpl["font_size_header"])
+    c.drawString(50, height - 60, f"{tmpl['name'].upper()} — {identity['doc_type'].replace('_', ' ').upper()}")
+
+    # Divider line
+    c.setStrokeColorRGB(r, g, b)
+    c.setLineWidth(1.5)
+    c.line(50, height - 70, width - 50, height - 70)
+
+    # Letterhead strip (standard on real KYC documents)
+    if tmpl.get("has_letterhead"):
+        c.setFont("Helvetica", 8)
+        c.setFillColorRGB(0.4, 0.4, 0.4)
+        c.drawString(50, height - 45, tmpl["issuer"])
+
+    # Reference / document number (standard on real KYC documents)
+    if tmpl.get("has_ref_number"):
+        ref_no = f"Ref No: {identity['base_id'][:8].upper()}"
+        c.setFont("Helvetica", 8)
+        c.drawRightString(width - 50, height - 45, ref_no)
+
+    # Fields — render and record bounding boxes
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont(tmpl["font_body"], tmpl["font_size_body"])
+
+    fields = [
+        ("Name", identity["full_name"]),
+        ("Date of Birth", identity["dob"]),
+        ("PAN", identity["pan"]),
+        ("Address", identity["address"]),
+        ("Account Number", identity["account_number"]),
+        ("IFSC Code", identity["ifsc"]),
+        ("Monthly Income", f"Rs. {identity['income']}"),
+        ("Employer", identity["employer"]),
+        ("Email", identity["email"]),
+        ("Phone", identity["phone"]),
+        ("Statement Date", identity["statement_date"]),
+    ]
+
+    y_pos = height - 100
+    for label, value in fields:
+        c.setFont(tmpl["font_body"] + "" if "Bold" not in tmpl["font_body"] else tmpl["font_body"],
+                  tmpl["font_size_body"] - 1)
+        c.setFillColorRGB(0.4, 0.4, 0.4)
+        c.drawString(50, y_pos, f"{label}:")
+
+        c.setFont(tmpl["font_body"], tmpl["font_size_body"])
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(200, y_pos, value)
+
+        # Record bounding box of the value field
+        field_boxes[label] = {
+            "x": 200,
+            "y": y_pos - 4,
+            "w": 300,
+            "h": tmpl["font_size_body"] + 4,
+            "value": value,
+            "font": tmpl["font_body"],
+            "font_size": tmpl["font_size_body"]
+        }
+
+        y_pos -= 28
+
+    # Footer — standard disclaimer + document ID, as on real institutional documents
+    c.setFillColorRGB(0.5, 0.5, 0.5)
+    c.setFont("Helvetica", 7)
+    c.drawString(50, 30, f"{tmpl.get('footer_disclaimer', '')} | Document ID: {identity['base_id']}")
+
+    c.save()
+    return field_boxes
+```
+
+---
+
+## Step 3 — Visual Tampering (Font Mismatch + Alignment Offset)
+
+```python
+from PIL import Image, ImageDraw, ImageFont
+import fitz  # PyMuPDF — pip install pymupdf
+import random
+
+# Mismatched fonts to inject — these should look visually different from ReportLab defaults
+MISMATCH_FONTS = [
+    "arial.ttf",
+    "verdana.ttf",
+    "georgia.ttf",
+    "trebuc.ttf",
+    "comic.ttf",   # deliberately obvious mismatch for high-severity class
+    "cour.ttf"     # courier — obvious mismatch on non-courier docs
+]
+
+TAMPERABLE_FIELDS = [
+    "Monthly Income",
+    "Date of Birth",
+    "Account Number",
+    "Address",
+    "Employer"
+]
+
+def apply_visual_tampering(pdf_path, output_path, field_boxes, severity="medium"):
+    """
+    Opens PDF as image, erases a field value, re-types it with a mismatched font.
+    Returns a dict of what was tampered for ground truth logging.
+
+    severity: "low" (subtle offset only), "medium" (font mismatch), "high" (obvious mismatch)
+    """
+
+    # Choose which field to tamper
+    available = [f for f in TAMPERABLE_FIELDS if f in field_boxes]
+    target_field = random.choice(available)
+    box = field_boxes[target_field]
+
+    # Convert PDF to image
+    doc = fitz.open(pdf_path)
+    page = doc[0]
+    mat = fitz.Matrix(2, 2)  # 2x resolution for better quality
+    pix = page.get_pixmap(matrix=mat)
+    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    doc.close()
+
+    draw = ImageDraw.Draw(img)
+
+    # Scale box coordinates to image resolution
+    scale = 2
+    x = int(box["x"] * scale)
+    y = int((842 - box["y"] - box["h"]) * scale)  # A4 height = 842 pts, flip Y axis
+    w = int(box["w"] * scale)
+    h = int(box["h"] * scale) + 4
+
+    # Erase original value — paint over with white
+    draw.rectangle([x - 2, y - 2, x + w + 2, y + h + 2], fill="white")
+
+    # Generate new fake value for the field
+    new_value = generate_fake_field_value(target_field)
+
+    # Apply alignment offset
+    if severity == "low":
+        x_offset = random.randint(-2, 2)
+        y_offset = random.randint(-2, 2)
+        font_size_delta = 0
+    elif severity == "medium":
+        x_offset = random.randint(-4, 4)
+        y_offset = random.randint(-3, 3)
+        font_size_delta = random.randint(-1, 1)
+    else:  # high
+        x_offset = random.randint(-8, 8)
+        y_offset = random.randint(-5, 5)
+        font_size_delta = random.randint(-2, 2)
+
+    # Select mismatched font
+    mismatch_font_file = random.choice(MISMATCH_FONTS)
+    font_size = int(box["font_size"] * scale) + font_size_delta
+
+    try:
+        font = ImageFont.truetype(mismatch_font_file, font_size)
+    except:
+        font = ImageFont.load_default()
+
+    # Draw tampered value
+    draw.text(
+        (x + x_offset, y + y_offset),
+        new_value,
+        fill=(0, 0, 0),
+        font=font
+    )
+
+    # Save as PDF
+    img.save(output_path.replace(".pdf", "_visual.png"))
+
+    # Convert back to PDF using img2pdf
+    import img2pdf  # pip install img2pdf
+    png_path = output_path.replace(".pdf", "_visual.png")
+    with open(output_path, "wb") as f:
+        f.write(img2pdf.convert(png_path))
+    os.remove(png_path)
+
+    return {
+        "tampered_field": target_field,
+        "original_value": box["value"],
+        "new_value": new_value,
+        "bounding_box": {"x": box["x"], "y": box["y"], "w": box["w"], "h": box["h"]},
+        "severity": severity,
+        "font_used": mismatch_font_file,
+        "x_offset": x_offset,
+        "y_offset": y_offset
+    }
+
+
+def generate_fake_field_value(field_name):
+    """Generate a plausible but fake replacement value for each field type."""
+    fake = Faker('en_IN')
+    generators = {
+        "Monthly Income": lambda: f"Rs. {random.randint(15000, 500000)}",
+        "Date of Birth": lambda: fake.date_of_birth(minimum_age=21, maximum_age=60).strftime("%d/%m/%Y"),
+        "Account Number": lambda: fake.numerify(text="XXXX XXXX XXXX XXXX"),
+        "Address": lambda: fake.address().replace("\n", ", "),
+        "Employer": lambda: fake.company()
+    }
+    return generators.get(field_name, lambda: fake.word())()
+```
+
+---
+
+## Step 4 — Metadata Corruption (12 Attributes + Temporal Anachronism)
+
+```python
+import pypdf
+from pypdf import PdfReader, PdfWriter
+import random
+from datetime import datetime, timedelta
+
+# The 12 metadata attributes to potentially corrupt
+METADATA_ATTRIBUTES = [
+    "/Title",
+    "/Author",
+    "/Subject",
+    "/Keywords",
+    "/Creator",
+    "/Producer",
+    "/CreationDate",
+    "/ModDate",
+    "/Trapped",
+    "/CustomField1",
+    "/CustomField2",
+    "/CustomField3"
+]
+
+# Software version signatures — used for temporal anachronism injection
+SOFTWARE_SIGNATURES = {
+    "old": [
+        "Adobe Acrobat 9.0",
+        "Microsoft Word 2010",
+        "LibreOffice 3.6",
+        "Adobe Acrobat 8.0",
+        "OpenOffice.org Writer 3.2"
+    ],
+    "medium": [
+        "Adobe Acrobat DC 2017",
+        "Microsoft Word 2016",
+        "LibreOffice 5.4",
+        "Foxit Reader 9.0"
+    ],
+    "new": [
+        "Adobe Acrobat DC 2024",
+        "Microsoft Word 2024",
+        "LibreOffice 7.6",
+        "iLovePDF Desktop 3.0",
+        "Smallpdf 2024",
+        "Adobe Acrobat 2024.002"
+    ]
+}
+
+
+def apply_metadata_tampering(pdf_path, output_path, claimed_year=None):
+    """
+    Randomises corruption across the 12 metadata attributes.
+    Optionally injects a temporal anachronism (old claimed date + new software).
+    Returns a dict of what was corrupted for ground truth logging.
+    """
+    reader = PdfReader(pdf_path)
+    writer = PdfWriter()
+
+    # Copy all pages
+    for page in reader.pages:
+        writer.add_page(page)
+
+    # Get existing metadata
+    existing_meta = reader.metadata or {}
+
+    # Decide how many attributes to corrupt — randomised between 2 and 7
+    num_to_corrupt = random.randint(2, 7)
+    attrs_to_corrupt = random.sample(METADATA_ATTRIBUTES, num_to_corrupt)
+
+    corruption_log = {}
+    new_metadata = {}
+
+    for attr in attrs_to_corrupt:
+        original = existing_meta.get(attr, "")
+
+        if attr == "/Producer" or attr == "/Creator":
+            # Always use a "new" software signature for temporal anachronism
+            new_val = random.choice(SOFTWARE_SIGNATURES["new"])
+
+        elif attr == "/CreationDate":
+            # Inject a claimed old date — temporal anachronism setup
+            if claimed_year:
+                fake_old_date = datetime(claimed_year,
+                                         random.randint(1, 12),
+                                         random.randint(1, 28))
+            else:
+                fake_old_date = datetime.now() - timedelta(days=random.randint(365, 1825))
+            new_val = fake_old_date.strftime("D:%Y%m%d%H%M%S")
+
+        elif attr == "/ModDate":
+            # Modification date AFTER creation date — inconsistency signal
+            recent_date = datetime.now() - timedelta(days=random.randint(0, 30))
+            new_val = recent_date.strftime("D:%Y%m%d%H%M%S")
+
+        elif attr == "/Author":
+            new_val = Faker('en_IN').name()
+
+        elif attr == "/Title":
+            new_val = random.choice([
+                "Scanned Document",
+                "Bank Statement Copy",
+                "Untitled",
+                "Document1",
+                "PDF Export"
+            ])
+
+        else:
+            new_val = Faker().word()
+
+        new_metadata[attr] = new_val
+        corruption_log[attr] = {
+            "original": str(original),
+            "corrupted_to": new_val
+        }
+
+    writer.add_metadata(new_metadata)
+
+    with open(output_path, "wb") as f:
+        writer.write(f)
+
+    # Compute temporal anachronism feature
+    temporal_delta = compute_temporal_anachronism(new_metadata)
+
+    return {
+        "num_attributes_corrupted": num_to_corrupt,
+        "corrupted_attributes": attrs_to_corrupt,
+        "corruption_details": corruption_log,
+        "temporal_anachronism_delta": temporal_delta
+    }
+
+
+def compute_temporal_anachronism(metadata):
+    """
+    Computes the cross-field temporal consistency score.
+    Returns the delta in years between claimed creation year and software version year.
+    Positive delta = document claims to be older than the software that made it = anachronism.
+    """
+    producer = metadata.get("/Producer", "") or metadata.get("/Creator", "")
+    creation_date_str = metadata.get("/CreationDate", "")
+
+    # Extract claimed creation year
+    claimed_year = None
+    if creation_date_str and len(creation_date_str) >= 6:
+        try:
+            claimed_year = int(creation_date_str[2:6])
+        except:
+            claimed_year = datetime.now().year
+
+    # Extract software version year from producer string
+    software_year = None
+    for year in range(2008, 2026):
+        if str(year) in producer:
+            software_year = year
+            break
+
+    if claimed_year and software_year:
+        delta = software_year - claimed_year
+        # Positive = software is newer than document claims = anachronism
+        return delta
+
+    return 0  # No detectable inconsistency
+```
+
+---
+
+## Step 5 — Metadata Feature Vector Extraction (13 Features)
+
+```python
+def extract_metadata_vector(pdf_path, temporal_delta=0):
+    """
+    Extracts the 13-dimensional metadata feature vector from a PDF.
+    This is the input to the Tabular MLP branch.
+    """
+    try:
+        reader = PdfReader(pdf_path)
+        meta = reader.metadata or {}
+    except:
+        return [0] * 13
+
+    def parse_pdf_date(date_str):
+        """Convert PDF date string to datetime."""
+        if not date_str or len(date_str) < 10:
+            return None
+        try:
+            return datetime.strptime(date_str[2:14], "%Y%m%d%H%M")
+        except:
+            return None
+
+    creation_date = parse_pdf_date(str(meta.get("/CreationDate", "")))
+    mod_date = parse_pdf_date(str(meta.get("/ModDate", "")))
+
+    # Feature 1: Has Creator field (1/0)
+    f1 = 1 if meta.get("/Creator") else 0
+
+    # Feature 2: Has Producer field (1/0)
+    f2 = 1 if meta.get("/Producer") else 0
+
+    # Feature 3: Has Author field (1/0)
+    f3 = 1 if meta.get("/Author") else 0
+
+    # Feature 4: Has CreationDate (1/0)
+    f4 = 1 if creation_date else 0
+
+    # Feature 5: Has ModDate (1/0)
+    f5 = 1 if mod_date else 0
+
+    # Feature 6: Time delta between CreationDate and ModDate (in days), 0 if same or missing
+    f6 = 0
+    if creation_date and mod_date:
+        delta = (mod_date - creation_date).days
+        f6 = max(0, delta)
+
+    # Feature 7: Creation year (normalised — subtract 2000)
+    f7 = (creation_date.year - 2000) if creation_date else 0
+
+    # Feature 8: Modification year (normalised)
+    f8 = (mod_date.year - 2000) if mod_date else 0
+
+    # Feature 9: Producer software known-suspect flag
+    # (iLovePDF, Smallpdf, Adobe consumer versions = likely editing tool)
+    suspect_tools = ["ilovepdf", "smallpdf", "online", "converter", "compress"]
+    producer_str = str(meta.get("/Producer", "")).lower()
+    f9 = 1 if any(t in producer_str for t in suspect_tools) else 0
+
+    # Feature 10: Producer string length (longer = more detailed = more likely genuine)
+    f10 = min(len(str(meta.get("/Producer", ""))), 100)
+
+    # Feature 11: Number of custom/non-standard metadata fields
+    standard_fields = {"/Title", "/Author", "/Subject", "/Keywords",
+                       "/Creator", "/Producer", "/CreationDate", "/ModDate", "/Trapped"}
+    f11 = sum(1 for k in meta.keys() if k not in standard_fields)
+
+    # Feature 12: Title matches expected document type patterns (1 = suspicious)
+    suspicious_titles = ["untitled", "document1", "scanned", "copy", "pdf"]
+    title_str = str(meta.get("/Title", "")).lower()
+    f12 = 1 if any(t in title_str for t in suspicious_titles) else 0
+
+    # Feature 13: Temporal anachronism delta (software year - claimed creation year)
+    # This is the novel cross-field consistency feature
+    f13 = temporal_delta
+
+    return [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13]
+
+
+METADATA_FEATURE_NAMES = [
+    "has_creator", "has_producer", "has_author",
+    "has_creation_date", "has_mod_date",
+    "creation_mod_delta_days", "creation_year_norm", "mod_year_norm",
+    "suspect_producer_tool", "producer_string_length",
+    "num_custom_fields", "suspicious_title_flag",
+    "temporal_anachronism_delta"
+]
+```
+
+---
+
+## Step 6 — Master Generation Loop
+
+```python
+import os
+import json
+import csv
+from tqdm import tqdm
+from pathlib import Path
+
+# Configuration
+CONFIG = {
+    "n_genuine": 1000,
+    "n_font_tampered": 1000,
+    "n_metadata_tampered": 1000,
+    "n_both_tampered": 1000,
+    "output_dir": "grogu_dataset",
+    "templates": list(TEMPLATES.keys()),
+    "severity_distribution": {
+        "low": 0.3,
+        "medium": 0.5,
+        "high": 0.2
+    }
+}
+
+
+def pick_severity():
+    r = random.random()
+    if r < 0.3:
+        return "low"
+    elif r < 0.8:
+        return "medium"
+    return "high"
+
+
+def run_pipeline():
+    # Create output dirs
+    for cls in ["genuine", "font_tampered", "metadata_tampered", "both_tampered"]:
+        Path(f"{CONFIG['output_dir']}/raw_pdfs/{cls}").mkdir(parents=True, exist_ok=True)
+        Path(f"{CONFIG['output_dir']}/rendered_images/{cls}").mkdir(parents=True, exist_ok=True)
+    Path(f"{CONFIG['output_dir']}/metadata_vectors").mkdir(parents=True, exist_ok=True)
+    Path(f"{CONFIG['output_dir']}/labels").mkdir(parents=True, exist_ok=True)
+    Path(f"{CONFIG['output_dir']}/splits").mkdir(parents=True, exist_ok=True)
+
+    all_records = []
+    generation_log = {"genuine": 0, "font_tampered": 0,
+                      "metadata_tampered": 0, "both_tampered": 0, "errors": 0}
+
+    # ── GENUINE ──────────────────────────────────────────────────
+    print("Generating Genuine documents...")
+    for i in tqdm(range(CONFIG["n_genuine"])):
+        try:
+            identity = generate_identity()
+            template_key = random.choice(CONFIG["templates"])
+
+            pdf_path = f"{CONFIG['output_dir']}/raw_pdfs/genuine/{identity['base_id']}_G.pdf"
+            field_boxes = generate_genuine_pdf(identity, template_key, pdf_path)
+
+            metadata_vec = extract_metadata_vector(pdf_path, temporal_delta=0)
+
+            record = {
+                "file_id": f"{identity['base_id']}_G",
+                "base_id": identity["base_id"],
+                "class": "genuine",
+                "label": 0,
+                "pdf_path": pdf_path,
+                "template": template_key,
+                "tamper_type": "none",
+                "tampered_field": None,
+                "original_value": None,
+                "new_value": None,
+                "bounding_box": None,
+                "metadata_corrupted_attrs": None,
+                "temporal_anachronism_delta": 0,
+                **{METADATA_FEATURE_NAMES[j]: metadata_vec[j] for j in range(13)}
+            }
+            all_records.append(record)
+            generation_log["genuine"] += 1
+
+        except Exception as e:
+            generation_log["errors"] += 1
+            print(f"Error generating genuine doc {i}: {e}")
+
+    # ── FONT TAMPERED ─────────────────────────────────────────────
+    print("Generating Font-Tampered documents...")
+    for i in tqdm(range(CONFIG["n_font_tampered"])):
+        try:
+            identity = generate_identity()
+            template_key = random.choice(CONFIG["templates"])
+
+            # Generate genuine first
+            genuine_path = f"{CONFIG['output_dir']}/raw_pdfs/font_tampered/{identity['base_id']}_G_base.pdf"
+            field_boxes = generate_genuine_pdf(identity, template_key, genuine_path)
+
+            # Apply visual tampering
+            tampered_path = f"{CONFIG['output_dir']}/raw_pdfs/font_tampered/{identity['base_id']}_FT.pdf"
+            severity = pick_severity()
+            tamper_info = apply_visual_tampering(genuine_path, tampered_path, field_boxes, severity)
+
+            # Remove the intermediate genuine base
+            os.remove(genuine_path)
+
+            metadata_vec = extract_metadata_vector(tampered_path, temporal_delta=0)
+
+            record = {
+                "file_id": f"{identity['base_id']}_FT",
+                "base_id": identity["base_id"],
+                "class": "font_tampered",
+                "label": 1,
+                "pdf_path": tampered_path,
+                "template": template_key,
+                "tamper_type": "visual",
+                "tampered_field": tamper_info["tampered_field"],
+                "original_value": tamper_info["original_value"],
+                "new_value": tamper_info["new_value"],
+                "bounding_box": json.dumps(tamper_info["bounding_box"]),
+                "metadata_corrupted_attrs": None,
+                "temporal_anachronism_delta": 0,
+                **{METADATA_FEATURE_NAMES[j]: metadata_vec[j] for j in range(13)}
+            }
+            all_records.append(record)
+            generation_log["font_tampered"] += 1
+
+        except Exception as e:
+            generation_log["errors"] += 1
+            print(f"Error generating font tampered doc {i}: {e}")
+
+    # ── METADATA TAMPERED ─────────────────────────────────────────
+    print("Generating Metadata-Tampered documents...")
+    for i in tqdm(range(CONFIG["n_metadata_tampered"])):
+        try:
+            identity = generate_identity()
+            template_key = random.choice(CONFIG["templates"])
+
+            genuine_path = f"{CONFIG['output_dir']}/raw_pdfs/metadata_tampered/{identity['base_id']}_G_base.pdf"
+            field_boxes = generate_genuine_pdf(identity, template_key, genuine_path)
+
+            tampered_path = f"{CONFIG['output_dir']}/raw_pdfs/metadata_tampered/{identity['base_id']}_MT.pdf"
+
+            # Pick a random "claimed year" for temporal anachronism
+            claimed_year = random.randint(2017, 2021)
+            meta_tamper_info = apply_metadata_tampering(genuine_path, tampered_path, claimed_year=claimed_year)
+
+            os.remove(genuine_path)
+
+            temporal_delta = meta_tamper_info["temporal_anachronism_delta"]
+            metadata_vec = extract_metadata_vector(tampered_path, temporal_delta=temporal_delta)
+
+            record = {
+                "file_id": f"{identity['base_id']}_MT",
+                "base_id": identity["base_id"],
+                "class": "metadata_tampered",
+                "label": 2,
+                "pdf_path": tampered_path,
+                "template": template_key,
+                "tamper_type": "metadata",
+                "tampered_field": None,
+                "original_value": None,
+                "new_value": None,
+                "bounding_box": None,
+                "metadata_corrupted_attrs": json.dumps(meta_tamper_info["corrupted_attributes"]),
+                "temporal_anachronism_delta": temporal_delta,
+                **{METADATA_FEATURE_NAMES[j]: metadata_vec[j] for j in range(13)}
+            }
+            all_records.append(record)
+            generation_log["metadata_tampered"] += 1
+
+        except Exception as e:
+            generation_log["errors"] += 1
+            print(f"Error generating metadata tampered doc {i}: {e}")
+
+    # ── BOTH TAMPERED ─────────────────────────────────────────────
+    print("Generating Both-Tampered documents...")
+    for i in tqdm(range(CONFIG["n_both_tampered"])):
+        try:
+            identity = generate_identity()
+            template_key = random.choice(CONFIG["templates"])
+
+            genuine_path = f"{CONFIG['output_dir']}/raw_pdfs/both_tampered/{identity['base_id']}_G_base.pdf"
+            field_boxes = generate_genuine_pdf(identity, template_key, genuine_path)
+
+            # Visual tampering first
+            visually_tampered_path = f"{CONFIG['output_dir']}/raw_pdfs/both_tampered/{identity['base_id']}_VT_base.pdf"
+            severity = pick_severity()
+            tamper_info = apply_visual_tampering(genuine_path, visually_tampered_path, field_boxes, severity)
+
+            # Then metadata tampering on top
+            both_path = f"{CONFIG['output_dir']}/raw_pdfs/both_tampered/{identity['base_id']}_BT.pdf"
+            claimed_year = random.randint(2017, 2021)
+            meta_tamper_info = apply_metadata_tampering(visually_tampered_path, both_path, claimed_year=claimed_year)
+
+            os.remove(genuine_path)
+            os.remove(visually_tampered_path)
+
+            temporal_delta = meta_tamper_info["temporal_anachronism_delta"]
+            metadata_vec = extract_metadata_vector(both_path, temporal_delta=temporal_delta)
+
+            record = {
+                "file_id": f"{identity['base_id']}_BT",
+                "base_id": identity["base_id"],
+                "class": "both_tampered",
+                "label": 3,
+                "pdf_path": both_path,
+                "template": template_key,
+                "tamper_type": "both",
+                "tampered_field": tamper_info["tampered_field"],
+                "original_value": tamper_info["original_value"],
+                "new_value": tamper_info["new_value"],
+                "bounding_box": json.dumps(tamper_info["bounding_box"]),
+                "metadata_corrupted_attrs": json.dumps(meta_tamper_info["corrupted_attributes"]),
+                "temporal_anachronism_delta": temporal_delta,
+                **{METADATA_FEATURE_NAMES[j]: metadata_vec[j] for j in range(13)}
+            }
+            all_records.append(record)
+            generation_log["both_tampered"] += 1
+
+        except Exception as e:
+            generation_log["errors"] += 1
+            print(f"Error generating both-tampered doc {i}: {e}")
+
+    return all_records, generation_log
+```
+
+---
+
+## Step 7 — Save Labels, Metadata CSV, and Train/Val/Test Split
+
+```python
+import pandas as pd
+from sklearn.model_selection import GroupShuffleSplit
+
+def save_outputs(all_records, generation_log):
+    df = pd.DataFrame(all_records)
+
+    # Save master labels CSV
+    df.to_csv(f"{CONFIG['output_dir']}/labels/master_labels.csv", index=False)
+
+    # Save metadata vectors only (for MLP branch)
+    meta_cols = ["file_id", "label", "class"] + METADATA_FEATURE_NAMES
+    df[meta_cols].to_csv(f"{CONFIG['output_dir']}/metadata_vectors/all_metadata.csv", index=False)
+
+    # ── CRITICAL: Split by base_id, NOT by file ──────────────────
+    # This prevents leakage between genuine and tampered variants
+    # of the same base document appearing on both sides of the split
+
+    gss_outer = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    gss_inner = GroupShuffleSplit(n_splits=1, test_size=0.125, random_state=42)
+
+    train_val_idx, test_idx = next(gss_outer.split(df, groups=df["base_id"]))
+    df_train_val = df.iloc[train_val_idx]
+    df_test = df.iloc[test_idx]
+
+    train_idx, val_idx = next(gss_inner.split(
+        df_train_val, groups=df_train_val["base_id"]
+    ))
+    df_train = df_train_val.iloc[train_idx]
+    df_val = df_train_val.iloc[val_idx]
+
+    df_train.to_csv(f"{CONFIG['output_dir']}/splits/train.csv", index=False)
+    df_val.to_csv(f"{CONFIG['output_dir']}/splits/val.csv", index=False)
+    df_test.to_csv(f"{CONFIG['output_dir']}/splits/test.csv", index=False)
+
+    # Verify no base_id leakage across splits
+    assert len(set(df_train["base_id"]) & set(df_test["base_id"])) == 0, \
+        "LEAKAGE DETECTED: base_id appears in both train and test"
+    assert len(set(df_val["base_id"]) & set(df_test["base_id"])) == 0, \
+        "LEAKAGE DETECTED: base_id appears in both val and test"
+
+    print("No leakage detected — split is clean.")
+
+    # Save generation log
+    generation_log["split_sizes"] = {
+        "train": len(df_train),
+        "val": len(df_val),
+        "test": len(df_test),
+        "total": len(df)
+    }
+    generation_log["class_distribution"] = df["class"].value_counts().to_dict()
+    generation_log["leakage_check"] = "PASSED"
+
+    with open(f"{CONFIG['output_dir']}/generation_log.json", "w") as f:
+        json.dump(generation_log, f, indent=2)
+
+    print("\n=== GENERATION COMPLETE ===")
+    print(f"Total files: {len(df)}")
+    print(f"Train: {len(df_train)} | Val: {len(df_val)} | Test: {len(df_test)}")
+    print(f"Class distribution:\n{df['class'].value_counts()}")
+    print(f"Errors during generation: {generation_log['errors']}")
+    print(f"Leakage check: PASSED")
+```
+
+---
+
+## Step 8 — Entry Point
+
+```python
+if __name__ == "__main__":
+    print("=== GROGU Dataset Generation Pipeline ===")
+    print(f"Target: {sum([CONFIG['n_genuine'], CONFIG['n_font_tampered'], CONFIG['n_metadata_tampered'], CONFIG['n_both_tampered']])} documents across 4 classes")
+    print("Starting generation...\n")
+
+    all_records, generation_log = run_pipeline()
+    save_outputs(all_records, generation_log)
+```
+
+---
+
+## Step 9 — Verification Script (Run After Generation)
+
+```python
+# verify_dataset.py — run this after generation to confirm dataset integrity
+
+import pandas as pd
+import os
+
+df = pd.read_csv("grogu_dataset/labels/master_labels.csv")
+train = pd.read_csv("grogu_dataset/splits/train.csv")
+val = pd.read_csv("grogu_dataset/splits/val.csv")
+test = pd.read_csv("grogu_dataset/splits/test.csv")
+
+print("=== DATASET VERIFICATION ===\n")
+
+# 1. Class balance check
+print("Class distribution (full dataset):")
+print(df["class"].value_counts())
+print()
+
+# 2. Leakage check
+train_ids = set(train["base_id"])
+val_ids = set(val["base_id"])
+test_ids = set(test["base_id"])
+print(f"Train-Test base_id overlap: {len(train_ids & test_ids)} (must be 0)")
+print(f"Val-Test base_id overlap: {len(val_ids & test_ids)} (must be 0)")
+print(f"Train-Val base_id overlap: {len(train_ids & val_ids)} (must be 0)")
+print()
+
+# 3. File existence check
+missing = 0
+for _, row in df.iterrows():
+    if not os.path.exists(row["pdf_path"]):
+        missing += 1
+print(f"Missing PDF files: {missing} (must be 0)")
+print()
+
+# 4. Temporal anachronism stats
+print("Temporal anachronism delta distribution:")
+print(df.groupby("class")["temporal_anachronism_delta"].describe())
+print()
+
+# 5. Metadata vector completeness
+meta_df = pd.read_csv("grogu_dataset/metadata_vectors/all_metadata.csv")
+print(f"Metadata vectors: {len(meta_df)} rows, {len(meta_df.columns)} columns")
+print(f"Null values in metadata vectors: {meta_df.isnull().sum().sum()}")
+
+print("\n=== VERIFICATION COMPLETE ===")
+```
+
+---
+
+## Notes for Antigravity
+
+1. **Font files** — The visual tampering step references system font files by name (`arial.ttf`, `verdana.ttf` etc.). On the build machine, either use the system font path (`/usr/share/fonts/` on Linux, `C:/Windows/Fonts/` on Windows) or bundle font files in a `fonts/` folder and update the path in `MISMATCH_FONTS`.
+
+2. **WeasyPrint** — If WeasyPrint has installation issues (it requires Cairo and Pango), use only ReportLab for all 5 templates and differentiate them using different structural layouts, field ordering, and letterhead placement instead of a different renderer. The goal is structural diversity resembling real institutional documents, not specifically WeasyPrint.
+
+3. **img2pdf** — Required for converting tampered images back to PDF. Install via `pip install img2pdf`. If this causes issues, use `PIL.Image.save()` with `format='PDF'` as a fallback.
+
+4. **PyMuPDF (fitz)** — Required for rendering PDF to image for visual tampering. Install via `pip install pymupdf`.
+
+5. **Generation time** — 4,000 documents will take approximately 20-40 minutes depending on machine speed. Run with `tqdm` progress bars so progress is visible.
+
+6. **Error handling** — Wrap every individual document generation in try/except so a single failure does not abort the entire run. Log errors to `generation_log.json`.
+
+7. **Run order** — Run `dataset_generator.py` first, then `verify_dataset.py`. Both scripts must complete without errors before model training begins.
+
+8. **Template realism check** — Before running the full 4,000-document batch, render one sample PDF per template (`T1`–`T5`) and visually inspect them. Each should be plausible as a real institutional document at a glance — letterhead strip, reference number, muted corporate color, standard disclaimer footer — with no italic/oblique headers or saturated decorative colors. If a template still reads as "designed" rather than "official," adjust `header_color` toward greyscale/navy and remove any remaining stylistic flourishes before generating the full dataset.

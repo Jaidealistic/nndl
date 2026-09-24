@@ -1,0 +1,10 @@
+graph TD
+    A[User Uploads PDF] --> B[PDF Ingestion & Preprocessing]
+    B -- Renders Page --> C[Visual Branch: MobileNetV2]
+    B -- Extracts 13 Attrs --> D[Metadata Branch: Tabular MLP]
+    C --> E[1280-d Embedding]
+    D --> F[64-d Embedding]
+    E --> G[Late Fusion: torch.cat]
+    F --> G
+    G --> H[4-Class Classification Head]
+    H --> I[Grad-CAM Heatmap & Audit Report]

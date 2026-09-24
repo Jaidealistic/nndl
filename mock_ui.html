@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GROGU Mock UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #F5F3EF;
+            --text-color: #111111;
+            --accent-color: #1E6B70; /* Teal/blue accent */
+            --border-color: #D6D3CB;
+            --placeholder-color: #A3A098;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2.5rem 4rem;
+        }
+
+        .nav-brand {
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .nav-operator {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: var(--accent-color);
+            letter-spacing: 0.03em;
+        }
+
+        .nav-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1.25rem;
+            border-radius: 50px;
+            color: var(--text-color);
+        }
+
+        /* Main Content */
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6rem 2rem;
+            max-width: 640px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 4.8rem;
+            font-weight: 400;
+            margin: 0 0 4.5rem 0;
+            text-align: center;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+            color: #000;
+        }
+
+        /* Form */
+        form {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 3.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 500;
+            color: #555;
+        }
+
+        input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.5rem 0 0.75rem 0;
+            font-size: 1.15rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 300;
+            outline: none;
+            color: var(--text-color);
+            transition: border-color 0.3s ease;
+        }
+        
+        input::placeholder {
+            color: var(--placeholder-color);
+            font-weight: 300;
+        }
+
+        input:focus {
+            border-bottom-color: var(--text-color);
+        }
+
+        .cta-button {
+            margin-top: 1.5rem;
+            background-color: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 1.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.3em;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: opacity 0.3s ease;
+            width: 100%;
+        }
+
+        .cta-button:hover {
+            opacity: 0.85;
+        }
+
+        /* Bottom Section */
+        footer {
+            padding: 2rem 0 4rem 0;
+            text-align: center;
+            margin-top: auto;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .footer-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 7.5rem;
+            line-height: 1;
+            letter-spacing: -0.04em;
+            color: #E6E3DB; /* Very subtle against the background */
+            white-space: nowrap;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+        
+        .footer-text span.italic {
+            font-style: italic;
+            font-weight: 400;
+        }
+        
+        .footer-text span.bold {
+            font-weight: 600;
+        }
+
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="nav-brand">GROGU</div>
+        <div class="nav-operator">Operator: Compliance Desk — Session Active</div>
+        <div class="nav-badge">Edge Analytics</div>
+    </nav>
+
+    <main>
+        <h1>Forensic<br>Verification.</h1>
+        
+        <form>
+            <div class="form-group">
+                <label>KYC Document Type</label>
+                <input type="text" placeholder="e.g. Income Certificate, Bank Statement">
+            </div>
+
+            <div class="form-group">
+                <label>Target File</label>
+                <input type="text" placeholder="Select PDF for bimodal analysis...">
+            </div>
+
+            <div class="form-group">
+                <label>Analysis Mode</label>
+                <input type="text" placeholder="Visual & Metadata (Dual-Signal)">
+            </div>
+
+            <button type="button" class="cta-button">Run Forensics</button>
+        </form>
+    </main>
+
+    <footer>
+        <div class="footer-text">
+            <span class="bold">Bimodal</span><span class="italic">&nbsp;Forensic&nbsp;</span><span class="bold">Engine.</span>
+        </div>
+    </footer>
+
+</body>
+</html>
