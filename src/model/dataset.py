@@ -60,17 +60,34 @@ class GROGUBimodalDataset(Dataset):
         ])
 
     def _render_pdf_to_image(self, pdf_path):
-        """Render first page of PDF to PIL Image using PyMuPDF."""
-        if HAS_FITZ and os.path.exists(pdf_path):
+        """Render first page of PDF to PIL Image using cache if available, else PyMuPDF."""
+        # 1. Check if cached JPEG exists
+        base_name = os.path.basename(pdf_path)
+        cache_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'grogu_dataset', 'cache')
+        cached_img_path = os.path.join(cache_dir, f"{base_name}.jpg")
+        if os.path.exists(cached_img_path):
             try:
-                doc = fitz.open(pdf_path)
+                return Image.open(cached_img_path).convert("RGB")
+            except Exception:
+                pass
+
+        # 2. Path resolution
+        if not os.path.isabs(pdf_path):
+            proj_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+            abs_path = os.path.join(proj_root, pdf_path)
+        else:
+            abs_path = pdf_path
+
+        # 3. Fallback to direct PyMuPDF rendering
+        if HAS_FITZ and os.path.exists(abs_path):
+            try:
+                doc = fitz.open(abs_path)
                 page = doc[0]
-                # Render at 150 DPI (scale factor 150/72 ≈ 2.08)
                 mat = fitz.Matrix(2.08, 2.08)
                 pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
-                img_bytes = pix.tobytes("png")
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 doc.close()
-                return Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                return img
             except Exception:
                 pass
         # Fallback: blank white image
