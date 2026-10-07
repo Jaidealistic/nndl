@@ -17,11 +17,13 @@ env/
 gv/
 C:/gv/
 
-# ── Model weights (large binary – store on Google Drive / HuggingFace) ──
+# ── Model weights ──
 *.pth
 *.pt
 *.onnx
 *.tflite
+!src/model/grogu_model.pth
+!src/model/grogu_model_quantized.pt
 
 # ── Dataset (too large for GitHub – distributed via SharePoint/Dataport) ─
 dataset/grogu_dataset/
