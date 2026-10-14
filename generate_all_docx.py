@@ -18,28 +18,25 @@ HEX_ZEBRA = "F8FAFC"
 HEX_BORDER = "CBD5E1"
 HEX_CALLOUT_BG = "F1F5F9"
 
-def setup_page(doc, header_title):
+def setup_page(doc):
+    """Configures 1-inch margins and ensures headers and footers are completely removed/empty."""
     section = doc.sections[0]
     section.top_margin = Inches(1)
     section.bottom_margin = Inches(1)
     section.left_margin = Inches(1)
     section.right_margin = Inches(1)
     
+    # Completely clear header
     header = section.header
-    hp = header.paragraphs[0]
-    hp.text = f"GROGU-KYC Project | {header_title}"
-    hp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    hp.style.font.name = "Calibri"
-    hp.style.font.size = Pt(8.5)
-    hp.style.font.color.rgb = RGBColor(140, 150, 165)
-    
+    header.is_linked_to_previous = False
+    for p in header.paragraphs:
+        p.text = ""
+        
+    # Completely clear footer
     footer = section.footer
-    fp = footer.paragraphs[0]
-    fp.text = "Confidential — Deep Learning Technical Deliverable (Review 3 Submission)"
-    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    fp.style.font.name = "Calibri"
-    fp.style.font.size = Pt(8.5)
-    fp.style.font.color.rgb = RGBColor(160, 170, 185)
+    footer.is_linked_to_previous = False
+    for p in footer.paragraphs:
+        p.text = ""
 
 def set_cell_background(cell, fill_hex):
     tcPr = cell._tc.get_or_add_tcPr()
@@ -87,7 +84,7 @@ def add_title_block(doc, title, subtitle, meta_items):
     p_sub.paragraph_format.space_after = Pt(12)
     run_sub = p_sub.add_run(subtitle)
     run_sub.font.name = "Calibri"
-    run_sub.font.size = Pt(11.5)
+    run_sub.font.size = Pt(11)
     run_sub.font.color.rgb = COLOR_MUTED
     
     tbl = doc.add_table(rows=1, cols=len(meta_items))
@@ -284,7 +281,7 @@ def add_image_with_caption(doc, img_path, caption_text, width=Inches(5.8)):
 # ==============================================================================
 def generate_document_1(output_path):
     doc = Document()
-    setup_page(doc, "Deliverable 1: GAN Baseline vs GROGU")
+    setup_page(doc)
     
     add_title_block(
         doc,
@@ -293,8 +290,8 @@ def generate_document_1(output_path):
         [
             ("PROJECT", "GROGU-KYC Fraud Detection"),
             ("DELIVERABLE", "Module 1: GAN Results"),
-            ("TEAM MEMBERS", "Jai & Sanjay"),
-            ("DATE", "October 2026")
+            ("TEAM NO", "2"),
+            ("TEAM MEMBERS", "Jai Subiksha T & Sanjay AR")
         ]
     )
     
@@ -463,7 +460,7 @@ def generate_document_1(output_path):
 # ==============================================================================
 def generate_document_2(output_path):
     doc = Document()
-    setup_page(doc, "Deliverable 2: Multimodal Explainable AI")
+    setup_page(doc)
     
     add_title_block(
         doc,
@@ -472,8 +469,9 @@ def generate_document_2(output_path):
         [
             ("PROJECT", "GROGU-KYC Fraud Detection"),
             ("DELIVERABLE", "Module 2: Team XAI Framework"),
-            ("STUDENT 1 (VISION)", "Jai"),
-            ("STUDENT 2 (METADATA)", "Sanjay")
+            ("TEAM NO", "2"),
+            ("STUDENT 1 (VISION)", "Jai Subiksha T"),
+            ("STUDENT 2 (METADATA)", "Sanjay AR")
         ]
     )
     
@@ -495,13 +493,13 @@ def generate_document_2(output_path):
         doc,
         "Engineered the Computer Vision explainability pipeline using Gradient-weighted Class Activation Mapping (Grad-CAM), "
         "extracting spatial activation maps from MobileNetV2's final convolutional layer to visually highlight forged pixels, altered dates, and spliced figures.",
-        "Student 1 (Jai) — Visual Explainability Lead: "
+        "Student 1: Jai Subiksha T — Visual Explainability Lead: "
     )
     add_bullet_p(
         doc,
         "Engineered the Tabular Metadata explainability pipeline using first-order Input x Gradient attribution across all 13 structural "
         "and temporal PDF features, identifying anomalous tool signatures, temporal anachronisms, and producer anomalies.",
-        "Student 2 (Sanjay) — Metadata Explainability Lead: "
+        "Student 2: Sanjay AR — Metadata Explainability Lead: "
     )
     add_bullet_p(
         doc,
@@ -510,7 +508,7 @@ def generate_document_2(output_path):
         "Joint Collaborative Innovation: "
     )
     
-    add_heading_1(doc, "2. Student 1 (Jai): Visual Explainability via Grad-CAM")
+    add_heading_1(doc, "2. Student 1: Jai Subiksha T — Visual Explainability via Grad-CAM")
     add_heading_2(doc, "2.1 Mathematical & Theoretical Formulation")
     add_body_p(
         doc,
@@ -546,12 +544,12 @@ def generate_document_2(output_path):
         "directly into base64 PNG format for zero-overhead transmission to the web user interface."
     )
     
-    add_heading_1(doc, "3. Student 2 (Sanjay): Metadata Explainability via Input × Gradient")
+    add_heading_1(doc, "3. Student 2: Sanjay AR — Metadata Explainability via Input × Gradient")
     add_heading_2(doc, "3.1 Mathematical & Theoretical Formulation")
     add_body_p(
         doc,
         "While visual heatmaps localize spatial pixel anomalies, they cannot explain why a document was flagged for header tampering "
-        "or impossible temporal deltas. To interpret the 13-dimensional metadata vector x in R^13, Sanjay engineered a first-order "
+        "or impossible temporal deltas. To interpret the 13-dimensional metadata vector x in R^13, Sanjay AR engineered a first-order "
         "gradient attribution explainer (src/model/xai_metadata.py)."
     )
     add_body_p(
@@ -605,7 +603,7 @@ def generate_document_2(output_path):
     )
     add_body_p(
         doc,
-        "Jai and Sanjay collaborated to eliminate this redundancy by modifying predict.py. By setting meta_tensor.requires_grad = True "
+        "Jai Subiksha T and Sanjay AR collaborated to eliminate this redundancy by modifying predict.py. By setting meta_tensor.requires_grad = True "
         "before the primary model forward pass, PyTorch retains the entire multimodal computational graph. When score.backward() "
         "is executed for Grad-CAM, the exact same backpropagation pass populates meta_tensor.grad simultaneously. "
         "Metadata attributions are then computed via vector dot product with zero additional forward passes, reducing explainability "
@@ -620,13 +618,13 @@ def generate_document_2(output_path):
     add_bullet_p(
         doc,
         "Displays the high-resolution Grad-CAM visual overlay alongside a 4-class probability breakdown, highlighting specific forged regions.",
-        "Student 1 Visual Card: "
+        "Student 1: Jai Subiksha T — Visual Card: "
     )
     add_bullet_p(
         doc,
         "Displays horizontal attribution bars for the top metadata driving features, color-coded with red (positive fraud evidence) "
         "and green (genuine confirmation), alongside anomaly warning badges for temporal discrepancies.",
-        "Student 2 Metadata Card: "
+        "Student 2: Sanjay AR — Metadata Card: "
     )
     
     add_heading_1(doc, "6. Case Studies on Real Document Forgeries")
@@ -657,7 +655,7 @@ def generate_document_2(output_path):
     
     add_heading_1(doc, "7. Summary of Team Contributions")
     
-    contrib_headers = ["Project Dimension", "Student 1: Jai", "Student 2: Sanjay"]
+    contrib_headers = ["Project Dimension", "Student 1: Jai Subiksha T", "Student 2: Sanjay AR"]
     contrib_rows = [
         ["Core Responsibility", "Visual Explainability Lead & UI Integration", "Metadata Explainability Lead & Model Architecture"],
         ["Algorithm", "Grad-CAM on MobileNetV2 Layer 18", "Input x Gradient Attribution on 13-D Tabular MLP"],
@@ -677,7 +675,7 @@ def generate_document_2(output_path):
 # ==============================================================================
 def generate_document_3(output_path):
     doc = Document()
-    setup_page(doc, "Deliverable 3: Systematic Ablation Study")
+    setup_page(doc)
     
     add_title_block(
         doc,
@@ -686,8 +684,9 @@ def generate_document_3(output_path):
         [
             ("PROJECT", "GROGU-KYC Fraud Detection"),
             ("DELIVERABLE", "Module 3: Ablation Study"),
-            ("TEST COHORT", "400 Balanced Test Documents"),
-            ("AUTHORS", "Jai & Sanjay")
+            ("TEAM NO", "2"),
+            ("TEAM MEMBERS", "Jai Subiksha T & Sanjay AR"),
+            ("TEST COHORT", "400 Balanced Test Documents")
         ]
     )
     
@@ -840,7 +839,7 @@ def generate_document_3(output_path):
 # ==============================================================================
 def generate_document_4(output_path):
     doc = Document()
-    setup_page(doc, "Deliverable 4: T&E Framework Report")
+    setup_page(doc)
     
     add_title_block(
         doc,
@@ -849,8 +848,9 @@ def generate_document_4(output_path):
         [
             ("PROJECT", "GROGU-KYC Fraud Detection"),
             ("DELIVERABLE", "Module 4: Testing & Test Design"),
-            ("TEST SUITE SIZE", "170 Total Tests (156 Passed, 14 Xfailed)"),
-            ("GRADED TEAM", "Jai (API/UI/Data) & Sanjay (Model/Inference)")
+            ("TEAM NO", "2"),
+            ("TEAM MEMBERS", "Jai Subiksha T & Sanjay AR"),
+            ("TEST SUITE SIZE", "170 Total Tests (156 Passed, 14 Xfailed)")
         ]
     )
     
@@ -872,10 +872,10 @@ def generate_document_4(output_path):
     add_heading_1(doc, "2. Individual Responsibility Matrix (Graded Individually)")
     add_body_p(
         doc,
-        "As required for academic evaluation, testing responsibilities were partitioned cleanly between the two students:"
+        "As required for academic evaluation, testing responsibilities were partitioned cleanly between the two students in Team 2:"
     )
     
-    resp_headers = ["Testing Dimension", "Student 1: Jai (API, UI & Data)", "Student 2: Sanjay (Model & Inference)"]
+    resp_headers = ["Testing Dimension", "Student 1: Jai Subiksha T (API, UI & Data)", "Student 2: Sanjay AR (Model & Inference)"]
     resp_rows = [
         ["White-Box Testing", "test_jai_generator_whitebox.py (Identity math, 5 PDF templates, tamper branches, split leakage)", "test_sanjay_model_whitebox.py (Tensor shapes, 1312-D fusion, freeze/unfreeze, Grad-CAM hooks, INT8 quantization)"],
         ["Black-Box Testing", "test_jai_blackbox_api.py (Equivalence partitioning, boundary values, error-guessing, schema contract)", "test_sanjay_metamorphic.py (Metamorphic relations MR1-MR7, boundary-value metadata delta analysis)"],
@@ -1019,4 +1019,4 @@ if __name__ == "__main__":
     generate_document_2("2_Explainable_AI_Team_Effort.docx")
     generate_document_3("3_Ablation_Study.docx")
     generate_document_4("4_Testing_and_Test_Design_Framework.docx")
-    print("ALL 4 DELIVERABLE DOCX FILES GENERATED SUCCESSFULLY!")
+    print("ALL 4 DELIVERABLE DOCX FILES REGENERATED CLEANLY WITHOUT HEADERS/FOOTERS!")
