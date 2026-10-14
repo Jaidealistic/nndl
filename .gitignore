@@ -29,6 +29,10 @@ C:/gv/
 dataset/grogu_dataset/
 grogu_dataset/
 dataset/grogu_dataset.zip
+grogu_kyc_10k_dataset/
+grogu_kyc_10k_dataset.zip
+package_ieee_dataport.py
+metadata.csv
 dataset/__pycache__/
 dataset_generation_log.txt
 
