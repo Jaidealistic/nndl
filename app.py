@@ -102,6 +102,10 @@ def predict():
     pdf_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(pdf_path)
     
+    if os.path.getsize(pdf_path) == 0:
+        os.remove(pdf_path)
+        return jsonify({"error": "The uploaded PDF is empty (0 bytes). Please upload a valid document."}), 400
+        
     heatmap_path = os.path.join(UPLOAD_FOLDER, f"heatmap_{filename}.jpg")
     
     try:

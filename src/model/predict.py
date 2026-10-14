@@ -17,6 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 from dataset_generator import extract_metadata_vector
 
 from architecture import GROGUArchitecture
+from xai_metadata import MetadataExplainer
 
 class GROGUPredictor:
     def __init__(self, model_path):
@@ -24,6 +25,7 @@ class GROGUPredictor:
         self.model = GROGUArchitecture(num_classes=4, meta_features=13).to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
         self.model.eval()
+        self.meta_explainer = MetadataExplainer(self.model)
         
         self.transform = transforms.Compose([
             transforms.Resize((224, 224)),
@@ -81,6 +83,7 @@ class GROGUPredictor:
         # 2. Extract Metadata
         meta_vec = extract_metadata_vector(pdf_path, temporal_delta=0)
         meta_tensor = torch.tensor(meta_vec, dtype=torch.float32).unsqueeze(0).to(self.device)
+        meta_tensor.requires_grad = True
 
         # 3. Forward Pass
         self.model.zero_grad()
@@ -89,7 +92,7 @@ class GROGUPredictor:
         pred_class = torch.argmax(probs, dim=1).item()
         confidence = probs[0][pred_class].item()
 
-        # 4. Backward pass to get gradients for Grad-CAM
+        # 4. Backward pass to get gradients for Grad-CAM and Metadata Attribution simultaneously
         score = logits[0, pred_class]
         score.backward()
 
@@ -169,6 +172,14 @@ class GROGUPredictor:
             explanation.append("CRITICAL: Severe compound forgery detected across both optical and metadata streams.")
             explanation.append("Visual fields have been overwritten/spliced AND internal PDF headers reveal editing tools.")
 
+        # 8. Team XAI (Student 1 Vision Grad-CAM + Student 2 Metadata Feature Attribution)
+        meta_xai_report = self.meta_explainer.explain(
+            meta_tensor=meta_tensor,
+            meta_grads=meta_tensor.grad,
+            probs=probs,
+            target_class=pred_class
+        )
+
         return {
             "verdict": verdict,
             "confidence": round(confidence * 100, 2),
@@ -177,7 +188,24 @@ class GROGUPredictor:
             "original_base64": orig_b64,
             "probabilities": {self.classes[i]: round(probs[0][i].item() * 100, 2) for i in range(4)},
             "metadata_inspection": meta_dict,
-            "forensic_explanation": explanation
+            "forensic_explanation": explanation,
+            "team_xai": {
+                "visual_xai": {
+                    "modality": "Vision / Pixels",
+                    "technique": "Grad-CAM (Gradient-Weighted Class Activation Mapping)",
+                    "contributor": "Student 1 (Jai Subiksha T)",
+                    "target_layer": "MobileNetV2 features.18",
+                    "description": "Localizes typographic and font inconsistencies via spatial gradients."
+                },
+                "metadata_xai": {
+                    "modality": "Metadata / Byte-headers",
+                    "technique": "Input × Gradient Attribution (SHAP-aligned)",
+                    "contributor": "Student 2 (Sanjay AR)",
+                    "description": "Quantifies the exact percentage impact of each of the 13 PDF structural and temporal features.",
+                    "top_contributing_features": meta_xai_report["top_features"],
+                    "all_features": meta_xai_report["all_features"]
+                }
+            }
         }
 
 if __name__ == "__main__":

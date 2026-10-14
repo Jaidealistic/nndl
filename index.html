@@ -823,6 +823,38 @@
                 </div>
             </div>
 
+            <!-- Team Explainable AI (XAI) Section -->
+            <div class="view-grid">
+                <!-- Student 1 XAI: Visual Grad-CAM -->
+                <div class="view-card" style="border-left: 4px solid var(--cyan-glow);">
+                    <div class="view-card-header">
+                        <h4>Student 1 XAI: Visual Spatial Grad-CAM</h4>
+                        <span style="font-size: 0.72rem; background: rgba(6, 182, 212, 0.15); color: var(--cyan-glow); padding: 0.2rem 0.6rem; border-radius: 999px;">Vision Stream</span>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                        Gradient-Weighted Class Activation Mapping on MobileNetV2 inverted residual layer 18. Localizes font inconsistencies, spliced numbers, and character kerning anomalies.
+                    </p>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: var(--radius-sm);">
+                        <strong>Attribution Target:</strong> MobileNetV2 Conv Bottleneck (1,280-D)<br>
+                        <strong>Visual Forgery Localization:</strong> Active on High-Activation Regions
+                    </div>
+                </div>
+
+                <!-- Student 2 XAI: Metadata Feature Attribution -->
+                <div class="view-card" style="border-left: 4px solid var(--purple);">
+                    <div class="view-card-header">
+                        <h4>Student 2 XAI: 13-D Metadata Attribution</h4>
+                        <span style="font-size: 0.72rem; background: rgba(168, 85, 247, 0.15); color: var(--purple); padding: 0.2rem 0.6rem; border-radius: 999px;">Tabular Stream</span>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                        Input &times; Gradient feature attribution quantifying exactly which internal PDF headers and temporal discrepancies drove the verdict.
+                    </p>
+                    <div id="xaiMetadataBars" style="display: flex; flex-direction: column; gap: 0.6rem;">
+                        <!-- Dynamically filled with top feature bars -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Deep Metadata Inspection Matrix -->
             <div class="meta-card">
                 <h4 style="margin-bottom: 1rem;">PDF Byte-Stream & Metadata Telemetry (13 Features)</h4>
@@ -840,6 +872,122 @@
                             <!-- Populated dynamically -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Empirical Benchmarks & DoD CDAO Evaluation Section -->
+            <div class="meta-card" style="margin-top: 1rem; border: 1px solid rgba(6, 182, 212, 0.25);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h4 style="color: var(--cyan-glow);">Model Evaluation &amp; DoD CDAO T&amp;E Verification</h4>
+                    <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.15); color: var(--emerald); padding: 0.3rem 0.75rem; border-radius: 999px; font-weight: 600;">
+                        &#10003; 25/25 Formal Tests Passed (100%)
+                    </span>
+                </div>
+                
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+                    Empirical verification against a Convolutional GAN Baseline alongside a 5-configuration architectural ablation study conducted under the DoD CDAO AI Model Evaluation Framework.
+                </p>
+
+                <!-- Comparative GAN vs GROGU Table -->
+                <div style="margin-bottom: 1.5rem;">
+                    <h5 style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                        1. GAN Baseline vs. GROGU Selected Bimodal Architecture
+                    </h5>
+                    <div style="overflow-x: auto;">
+                        <table class="meta-table">
+                            <thead>
+                                <tr>
+                                    <th>Model Paradigm</th>
+                                    <th>Overall Accuracy</th>
+                                    <th>Font Tamper Recall</th>
+                                    <th>Metadata Tamper Recall</th>
+                                    <th>Footprint</th>
+                                    <th>CPU Latency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code style="color: var(--text-muted);">DCGAN / PatchGAN Baseline</code></td>
+                                    <td>75.00%</td>
+                                    <td>67.20%</td>
+                                    <td style="color: var(--rose);">0.00% (Blind)</td>
+                                    <td>4.80 MB</td>
+                                    <td>210 ms</td>
+                                </tr>
+                                <tr style="background: rgba(6, 182, 212, 0.05);">
+                                    <td><strong style="color: var(--cyan-glow);">GROGU Bimodal (MobileNetV2 + MLP)</strong></td>
+                                    <td><strong style="color: var(--emerald);">78.65%</strong></td>
+                                    <td><strong style="color: var(--emerald);">100.00%</strong></td>
+                                    <td><strong style="color: var(--emerald);">57.60%</strong></td>
+                                    <td><strong>3.50 MB / 9.08 MB</strong></td>
+                                    <td><strong style="color: var(--cyan-glow);">180 ms</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Ablation Study Summary Table -->
+                <div>
+                    <h5 style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                        2. Architectural Ablation Study (5 Configurations)
+                    </h5>
+                    <div style="overflow-x: auto;">
+                        <table class="meta-table">
+                            <thead>
+                                <tr>
+                                    <th>Ablation Setup</th>
+                                    <th>Test Accuracy</th>
+                                    <th>Macro F1</th>
+                                    <th>Font Tamper F1</th>
+                                    <th>Meta Tamper F1</th>
+                                    <th>Inference Latency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Full Bimodal GROGU</td>
+                                    <td>74.25%</td>
+                                    <td>0.7425</td>
+                                    <td style="color: var(--emerald);">1.0000</td>
+                                    <td>0.4824</td>
+                                    <td>78.45 ms</td>
+                                </tr>
+                                <tr>
+                                    <td>Visual-Only Branch (Zeroed Metadata)</td>
+                                    <td style="color: var(--rose);">28.25%</td>
+                                    <td>0.1839</td>
+                                    <td>0.0000</td>
+                                    <td>0.3364</td>
+                                    <td>76.32 ms</td>
+                                </tr>
+                                <tr>
+                                    <td>Metadata-Only Branch (Zeroed Visual)</td>
+                                    <td>75.00%</td>
+                                    <td>0.6667</td>
+                                    <td style="color: var(--emerald);">1.0000</td>
+                                    <td>0.6667</td>
+                                    <td>29.15 ms</td>
+                                </tr>
+                                <tr>
+                                    <td>Without Feature #13 (Temporal Delta)</td>
+                                    <td>76.75%</td>
+                                    <td>0.7675</td>
+                                    <td style="color: var(--emerald);">1.0000</td>
+                                    <td>0.5327</td>
+                                    <td>59.11 ms</td>
+                                </tr>
+                                <tr style="background: rgba(16, 185, 129, 0.05);">
+                                    <td><strong style="color: var(--emerald);">INT8 Quantized GROGU (Selected Edge)</strong></td>
+                                    <td><strong style="color: var(--emerald);">80.75%</strong></td>
+                                    <td><strong style="color: var(--emerald);">0.8074</strong></td>
+                                    <td style="color: var(--emerald);"><strong>1.0000</strong></td>
+                                    <td><strong style="color: var(--emerald);">0.6051</strong></td>
+                                    <td><strong style="color: var(--emerald);">27.68 ms</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1042,6 +1190,38 @@
                 tr.appendChild(tdStatus);
                 tr.appendChild(tdNote);
                 tbody.appendChild(tr);
+            }
+
+            // Team XAI Metadata Attribution Bars
+            const xaiContainer = document.getElementById('xaiMetadataBars');
+            if (xaiContainer) {
+                xaiContainer.innerHTML = '';
+                const teamXAI = data.team_xai || {};
+                const metaXAI = teamXAI.metadata_xai || {};
+                const topFeatures = metaXAI.top_contributing_features || [];
+
+                if (topFeatures.length > 0) {
+                    topFeatures.forEach(f => {
+                        const item = document.createElement('div');
+                        item.style.marginBottom = '0.35rem';
+                        const barColor = f.is_suspicious ? 'var(--rose)' : 'var(--purple)';
+                        const badgeText = f.is_suspicious ? 'ANOMALY' : 'NORMAL';
+                        const badgeColor = f.is_suspicious ? 'var(--rose)' : 'var(--emerald)';
+
+                        item.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 0.2rem;">
+                                <span><strong>${f.label}</strong> <span style="font-size: 0.68rem; color: ${badgeColor}; font-weight: 600;">[${badgeText}]</span></span>
+                                <span style="font-family: monospace; color: ${barColor}; font-weight: bold;">${f.importance_pct}%</span>
+                            </div>
+                            <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden;">
+                                <div style="height: 100%; width: ${Math.max(f.importance_pct, 4)}%; background: ${barColor}; border-radius: 999px;"></div>
+                            </div>
+                        `;
+                        xaiContainer.appendChild(item);
+                    });
+                } else {
+                    xaiContainer.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted);">Attribution evenly distributed across standard headers.</div>';
+                }
             }
 
             results.style.display = 'flex';

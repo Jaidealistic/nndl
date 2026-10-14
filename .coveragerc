@@ -1,0 +1,15 @@
+[run]
+branch = True
+include =
+    app.py
+    src/model/architecture.py
+    src/model/predict.py
+    src/model/dataset.py
+    dataset/dataset_generator.py
+[report]
+show_missing = True
+skip_covered = False
+omit =
+    */dist-packages/*
+    */site-packages/*
+    tests/*

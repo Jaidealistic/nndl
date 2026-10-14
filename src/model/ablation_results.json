@@ -1,0 +1,52 @@
+{
+  "Full_Bimodal_GROGU": {
+    "description": "Full Dual-Branch Late-Fusion Architecture (MobileNetV2 + 13-D Tabular MLP)",
+    "accuracy": 74.25,
+    "macro_f1": 0.7425,
+    "font_tamper_f1": 1.0,
+    "meta_tamper_f1": 0.4824,
+    "both_tamper_f1": 0.4876,
+    "model_size_mb": 10.09,
+    "latency_ms": 78.45
+  },
+  "Visual_Only_Branch": {
+    "description": "Visual Branch Only (Metadata zeroed out during inference)",
+    "accuracy": 28.25,
+    "macro_f1": 0.1839,
+    "font_tamper_f1": 0.0,
+    "meta_tamper_f1": 0.3364,
+    "both_tamper_f1": 0.399,
+    "model_size_mb": 9.85,
+    "latency_ms": 76.32
+  },
+  "Metadata_Only_Branch": {
+    "description": "Metadata Branch Only (Visual render zeroed out during inference)",
+    "accuracy": 75.0,
+    "macro_f1": 0.6667,
+    "font_tamper_f1": 1.0,
+    "meta_tamper_f1": 0.6667,
+    "both_tamper_f1": 0.0,
+    "model_size_mb": 0.24,
+    "latency_ms": 29.15
+  },
+  "Without_Temporal_Anachronism": {
+    "description": "Bimodal GROGU without Feature #13 (Temporal Delta zeroed)",
+    "accuracy": 76.75,
+    "macro_f1": 0.7675,
+    "font_tamper_f1": 1.0,
+    "meta_tamper_f1": 0.5327,
+    "both_tamper_f1": 0.5373,
+    "model_size_mb": 10.09,
+    "latency_ms": 59.11
+  },
+  "INT8_Quantized_GROGU": {
+    "description": "PyTorch Post-Training Dynamic INT8 Quantization (Linear layers qint8)",
+    "accuracy": 80.75,
+    "macro_f1": 0.8074,
+    "font_tamper_f1": 1.0,
+    "meta_tamper_f1": 0.6051,
+    "both_tamper_f1": 0.6244,
+    "model_size_mb": 9.08,
+    "latency_ms": 27.68
+  }
+}

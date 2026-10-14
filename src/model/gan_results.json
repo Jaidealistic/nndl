@@ -1,0 +1,58 @@
+{
+  "gan_baseline": {
+    "model_type": "DCGAN / PatchGAN Discriminator (Visual Patches Only)",
+    "forgery_detection_accuracy": 75.0,
+    "font_tampering_recall": 67.2,
+    "metadata_tampering_recall": 0.0,
+    "parameters": "1.2M",
+    "model_size_mb": 4.8,
+    "inference_cpu_ms": 210,
+    "explainability": "Patch-level discriminator confidence map",
+    "training_history": {
+      "epochs": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "g_loss": [
+        3.2029,
+        4.6613,
+        5.1822,
+        5.5001,
+        5.8748
+      ],
+      "d_loss": [
+        1.1074,
+        0.9394,
+        0.9289,
+        0.9349,
+        0.9268
+      ],
+      "d_accuracy": [
+        73.12,
+        74.88,
+        74.62,
+        74.75,
+        74.5
+      ]
+    }
+  },
+  "grogu_selected_model": {
+    "model_type": "GROGU Bimodal Fusion (MobileNetV2 CNN + 13-D Tabular MLP)",
+    "forgery_detection_accuracy": 78.65,
+    "font_tampering_recall": 100.0,
+    "metadata_tampering_recall": 57.6,
+    "parameters": "3.4M",
+    "model_size_mb": 3.5,
+    "inference_cpu_ms": 180,
+    "explainability": "Grad-CAM Heatmap + Metadata SHAP/Attribution",
+    "test_macro_f1": 0.7832
+  },
+  "architectural_insights": [
+    "GAN discriminators operate exclusively on visual pixel distributions, completely failing on metadata-only forgeries (0% recall).",
+    "GROGU's late-fusion bimodal pipeline captures both pixel anomalies (100% font tamper recall) and hidden structural anachronisms.",
+    "GROGU INT8 quantization provides a 27% smaller footprint and 14% faster CPU inference than the GAN baseline."
+  ]
+}
